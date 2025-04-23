@@ -1,0 +1,48 @@
+package tunnel
+
+import (
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/skeema/knownhosts"
+	"golang.org/x/crypto/ssh"
+)
+
+func createSshConfig(userName, keyFile string) *ssh.ClientConfig {
+	knownHostsCallback, err := knownhosts.New(sshConfigPath("known_hosts"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	key, err := os.ReadFile(keyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	singer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &ssh.ClientConfig{
+		User: userName,
+
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(singer),
+		},
+		HostKeyCallback: ssh.HostKeyCallback(knownHostsCallback),
+		HostKeyAlgorithms: []string{
+			ssh.KeyAlgoRSA,       // RSA
+			ssh.KeyAlgoED25519,   // ED25519
+			ssh.KeyAlgoECDSA256,  // ECDSA (NIST P-256)
+			ssh.KeyAlgoRSASHA256, // RSA with SHA-256
+			ssh.KeyAlgoRSASHA512,
+		},
+		Timeout: 5 * time.Second,
+	}
+}
+
+func sshConfigPath(filename string) string {
+	return filepath.Join(os.Getenv("HOME"), ".ssh", filename)
+}
