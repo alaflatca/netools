@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const SshCode = "1"
+const SshCode = "ssh"
 
 type sshReader struct {
 	list []Config
@@ -26,6 +26,10 @@ type Config struct {
 }
 
 func (cfg *Config) String() string {
+	return cfg.Name + "," + cfg.KeyPath
+}
+
+func (cfg *Config) Line() string {
 	var line string
 	if cfg.Name == "" || cfg.KeyPath == "" {
 		line = "===="
@@ -37,7 +41,6 @@ func (cfg *Config) String() string {
 
 func (sr *sshReader) Read(reader io.Reader) error {
 	sr.list = make([]Config, 0)
-	sr.list = append(sr.list, Config{Name: "+ Add Config"})
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -81,7 +84,7 @@ type sshWriter struct {
 }
 
 func (sr *sshWriter) Write(writer io.Writer) error {
-	line := sr.Config.String()
+	line := sr.Config.Line()
 
 	line = line + "\n"
 	_, err := writer.Write([]byte(line))

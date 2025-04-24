@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sshtn/mods/prompt"
 	"sshtn/mods/storage"
 	"syscall"
 )
@@ -25,9 +24,5 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	prompt := prompt.New()
-	if err := prompt.Run(); err != nil {
-		return err
-	}
 	return nil
 }
