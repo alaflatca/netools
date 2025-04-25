@@ -22,25 +22,45 @@ type sshReader struct {
 }
 type Config struct {
 	Name    string
+	Addr    string
+	Port    string
 	KeyPath string
+
+	LocalPort  string
+	RemotePort string
+
+	isExist bool
 }
 
-func (cfg *Config) String() string {
-	return cfg.Name + "," + cfg.KeyPath
+func (conf *Config) Address() string {
+	return conf.Addr + ":" + conf.Port
 }
 
-func (cfg *Config) Line() string {
+func (conf *Config) String() string {
+	if conf.isExist {
+		return fmt.Sprintf("[ %s:%s ] %s %s", conf.Addr, conf.Port, conf.Name, conf.KeyPath)
+	} else {
+		return conf.Name
+	}
+}
+
+func (conf *Config) Line() string {
 	var line string
-	if cfg.Name == "" || cfg.KeyPath == "" {
+	if conf.Name == "" || conf.KeyPath == "" {
 		line = "===="
 	} else {
-		line = fmt.Sprintf("%s,%s,%s", SshCode, cfg.Name, cfg.KeyPath)
+		line = fmt.Sprintf("%s,%s,%s,%s,%s", SshCode, conf.Addr, conf.Port, conf.Name, conf.KeyPath)
 	}
 	return line
 }
 
 func (sr *sshReader) Read(reader io.Reader) error {
 	sr.list = make([]Config, 0)
+	sr.list = append(sr.list, Config{
+		Name:    "+ Config Create",
+		KeyPath: "",
+		isExist: false,
+	})
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -55,8 +75,11 @@ func (sr *sshReader) Read(reader io.Reader) error {
 		}
 
 		cfg := Config{
-			Name:    split[1],
-			KeyPath: split[2],
+			Addr:    split[1],
+			Port:    split[2],
+			Name:    split[3],
+			KeyPath: split[4],
+			isExist: true,
 		}
 		sr.list = append(sr.list, cfg)
 	}
@@ -80,10 +103,13 @@ func SSHConfigList() ([]Config, error) {
 }
 
 type sshWriter struct {
-	Config Config
+	Config *Config
 }
 
 func (sr *sshWriter) Write(writer io.Writer) error {
+	if !sr.Config.isExist {
+		return nil
+	}
 	line := sr.Config.Line()
 
 	line = line + "\n"
@@ -95,7 +121,7 @@ func (sr *sshWriter) Write(writer io.Writer) error {
 	return nil
 }
 
-func SSHConfigCreate(config Config) error {
+func SSHConfigCreate(config *Config) error {
 	sw := &sshWriter{
 		Config: config,
 	}
@@ -108,9 +134,13 @@ func SSHConfigCreate(config Config) error {
 }
 
 func createSshConfig(userName, keyFile string) *ssh.ClientConfig {
+	var hostKeyCallback ssh.HostKeyCallback
 	knownHostsCallback, err := knownhosts.New(sshConfigPath("known_hosts"))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		hostKeyCallback = ssh.HostKeyCallback(knownHostsCallback)
 	}
 
 	key, err := os.ReadFile(keyFile)
@@ -128,7 +158,7 @@ func createSshConfig(userName, keyFile string) *ssh.ClientConfig {
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(singer),
 		},
-		HostKeyCallback: ssh.HostKeyCallback(knownHostsCallback),
+		HostKeyCallback: hostKeyCallback,
 		HostKeyAlgorithms: []string{
 			ssh.KeyAlgoRSA,       // RSA
 			ssh.KeyAlgoED25519,   // ED25519

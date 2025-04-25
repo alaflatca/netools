@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"context"
 	"errors"
 	"sshtn/mods/reverse"
 	"sshtn/mods/ssh"
@@ -35,7 +36,7 @@ const (
 	errorIdx   = -3
 )
 
-func Run() error {
+func Run(ctx context.Context) error {
 	prompt := promptui.Select{
 		Label: "Network Tools",
 		Items: []string{
@@ -53,7 +54,7 @@ func Run() error {
 
 	switch idx {
 	case 0:
-		return ssh.Run()
+		return ssh.Run(ctx)
 	case 1:
 		return vpn.Run()
 	case 2:

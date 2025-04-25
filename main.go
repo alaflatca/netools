@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sshtn/mods/prompt"
 	"sshtn/mods/storage"
 	"syscall"
 )
@@ -21,6 +22,10 @@ func run(ctx context.Context, args []string) error {
 	defer cancel()
 
 	if err := storage.CreateStorage(); err != nil {
+		return err
+	}
+
+	if err := prompt.Run(ctx); err != nil {
 		return err
 	}
 
