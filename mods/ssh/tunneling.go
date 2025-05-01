@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/manifoldco/promptui"
@@ -22,31 +24,71 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 	}
 	defer lsnr.Close()
 
-	select {
-	case <-ctx.Done():
-		return nil
-	default:
+	// spinner()
 
-		// spinner()
-
+	var wg sync.WaitGroup
+	var errCh = make(chan error, 2)
+	go func(ctx context.Context) {
 		localConn, err := lsnr.Accept()
 		if err != nil {
-			return err
+			errCh <- err
+			close(errCh)
+			return
 		}
 		defer localConn.Close()
 
 		remoteConn, err := client.Dial("tcp", "127.0.0.1:"+config.RemotePort)
 		if err != nil {
-			return err
+			errCh <- err
+			close(errCh)
+			return
 		}
 		defer remoteConn.Close()
 
-		go io.Copy(remoteConn, localConn)
-		go io.Copy(localConn, remoteConn)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := CopyContext(ctx, remoteConn, localConn); err != nil {
+				errCh <- fmt.Errorf("remote <--- local, '%w'", err)
+			}
+		}()
 
-		fmt.Printf("Local(:%s) <-------> Remote(:%s)\r", config.LocalPort, config.RemotePort)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := CopyContext(ctx, localConn, remoteConn); err != nil {
+				errCh <- fmt.Errorf("local <--- remote, '%w'", err)
+			}
+		}()
+
+		fmt.Printf("Local Port(:%s) <-------[tunneling established]-------> Remote Port(:%s)\r", config.LocalPort, config.RemotePort)
+		wg.Wait()
+		close(errCh)
+	}(ctx)
+
+	var firstError error
+	var ctxErr error
+
+	for {
+		select {
+		case <-ctx.Done():
+			ctxErr = ctx.Err()
+		case err, ok := <-errCh:
+			if !ok {
+				fmt.Printf("Local Port(:%s) X-------[tunneling disconnected]-------X Remote Port(:%s)\r", config.LocalPort, config.RemotePort)
+				if firstError != nil {
+					return firstError
+				}
+				return ctxErr
+			}
+			if err != nil {
+				log.Printf("tunneling error: %s", err)
+				if firstError == nil {
+					firstError = err
+				}
+			}
+		}
 	}
-	return nil
 }
 
 func promptTunneling(config *Config) error {
@@ -76,13 +118,35 @@ func promptTunneling(config *Config) error {
 	return nil
 }
 
-// func localListener(config *Config) error {
-
-// }
-
-// func RemoteToLocal() {
-
-// }
+func CopyContext(ctx context.Context, dsc io.Writer, src io.Reader) (written int64, err error) {
+	buf := make([]byte, 1024*32)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			nr, readErr := src.Read(buf)
+			if nr > 0 {
+				nw, writeErr := dsc.Write(buf[:nr])
+				if nw > 0 {
+					written += int64(nw)
+				}
+				if writeErr != nil {
+					return written, writeErr
+				}
+				if nr != nw {
+					return written, io.ErrShortWrite
+				}
+			}
+			if readErr != nil {
+				if readErr == io.EOF {
+					return written, nil
+				}
+				return written, readErr
+			}
+		}
+	}
+}
 
 func spinner() {
 	spinnerText := []string{"|", "/", "-", "\\"}

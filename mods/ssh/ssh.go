@@ -4,15 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"sshtn/mods/storage"
 	"strings"
 	"time"
 
-	"github.com/skeema/knownhosts"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 const SshCode = "ssh"
@@ -133,23 +133,57 @@ func SSHConfigCreate(config *Config) error {
 	return nil
 }
 
-func createSshConfig(userName, keyFile string) *ssh.ClientConfig {
-	var hostKeyCallback ssh.HostKeyCallback
-	knownHostsCallback, err := knownhosts.New(sshConfigPath("known_hosts"))
+func makeKnownHostsCallback(knownHostsPath string) (ssh.HostKeyCallback, error) {
+	knownHostsCallback, err := knownhosts.New(knownHostsPath)
 	if err != nil {
-		log.Println(err)
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		hostKeyCallback = ssh.HostKeyCallback(knownHostsCallback)
+		if os.IsNotExist(err) {
+			f, err := os.Create(knownHostsPath)
+			if err != nil {
+				return nil, err
+			}
+			f.Close()
+			knownHostsCallback, err = knownhosts.New(knownHostsPath)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := knownHostsCallback(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+		if _, ok := err.(*knownhosts.KeyError); ok {
+			f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			line := knownhosts.Line([]string{hostname}, key)
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+			fmt.Printf("[INFO] 새로운 서버 키를 known_hosts에 등록했습니다: %s\n", hostname)
+		}
+		return nil
+	}, nil
+}
+
+func createSshConfig(userName, keyFile string) (*ssh.ClientConfig, error) {
+	knownHostsPath := sshConfigPath("known_hosts")
+	hostKeyCallback, err := makeKnownHostsCallback(knownHostsPath)
+	if err != nil {
+		return nil, err
 	}
 
 	key, err := os.ReadFile(keyFile)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	singer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return &ssh.ClientConfig{
@@ -167,7 +201,7 @@ func createSshConfig(userName, keyFile string) *ssh.ClientConfig {
 			ssh.KeyAlgoRSASHA512,
 		},
 		Timeout: 5 * time.Second,
-	}
+	}, nil
 }
 
 func sshConfigPath(filename string) string {

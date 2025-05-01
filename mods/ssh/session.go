@@ -26,7 +26,7 @@ func session(ctx context.Context, conf *Config, client *ssh.Client) error {
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 
-	if err := session.RequestPty("linux", 80, 40, modes); err != nil {
+	if err := session.RequestPty("linux", 200, 60, modes); err != nil {
 		return err
 	}
 

@@ -26,7 +26,10 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
-	config := createSshConfig(selectConfig.Name, selectConfig.KeyPath)
+	config, err := createSshConfig(selectConfig.Name, selectConfig.KeyPath)
+	if err != nil {
+		return err
+	}
 
 	client, err := ssh.Dial("tcp", selectConfig.Address(), config)
 	if err != nil {
