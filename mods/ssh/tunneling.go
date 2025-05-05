@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -29,6 +28,7 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 	var wg sync.WaitGroup
 	var errCh = make(chan error, 2)
 	go func(ctx context.Context) {
+		fmt.Printf("Local Port(:%s) Listening\n", config.LocalPort)
 		localConn, err := lsnr.Accept()
 		if err != nil {
 			errCh <- err
@@ -68,11 +68,19 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 
 	var firstError error
 	var ctxErr error
+	// var once sync.Once
 
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Printf("[signal] shutdown\n")
 			ctxErr = ctx.Err()
+			lsnr.Close()
+			// once.Do(func() {
+			// 	fmt.Printf("[signal] shutdown\n")
+			// 	ctxErr = ctx.Err()
+			// 	lsnr.Close()
+			// })
 		case err, ok := <-errCh:
 			if !ok {
 				fmt.Printf("Local Port(:%s) X-------[tunneling disconnected]-------X Remote Port(:%s)\r", config.LocalPort, config.RemotePort)
@@ -82,7 +90,7 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 				return ctxErr
 			}
 			if err != nil {
-				log.Printf("tunneling error: %s", err)
+				// fmt.Printf("tunneling error: %s\n", err)
 				if firstError == nil {
 					firstError = err
 				}
@@ -120,29 +128,49 @@ func promptTunneling(config *Config) error {
 
 func CopyContext(ctx context.Context, dsc io.Writer, src io.Reader) (written int64, err error) {
 	buf := make([]byte, 1024*32)
+
+	type result struct {
+		n   int
+		err error
+	}
+	resultCh := make(chan result, 1)
+
+	go func() {
+		for {
+			nr, readErr := src.Read(buf)
+			select {
+			case resultCh <- result{nr, readErr}:
+			case <-ctx.Done():
+				return
+			}
+			if readErr != nil {
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		default:
-			nr, readErr := src.Read(buf)
-			if nr > 0 {
-				nw, writeErr := dsc.Write(buf[:nr])
+			return written, err
+		case res := <-resultCh:
+			if res.n > 0 {
+				nw, writeErr := dsc.Write(buf[:res.n])
 				if nw > 0 {
 					written += int64(nw)
 				}
 				if writeErr != nil {
 					return written, writeErr
 				}
-				if nr != nw {
+				if int(res.n) != nw {
 					return written, io.ErrShortWrite
 				}
 			}
-			if readErr != nil {
-				if readErr == io.EOF {
+			if res.err != nil {
+				if res.err == io.EOF {
 					return written, nil
 				}
-				return written, readErr
+				return written, res.err
 			}
 		}
 	}
