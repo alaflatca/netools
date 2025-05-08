@@ -68,7 +68,6 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 
 	var firstError error
 	var ctxErr error
-	// var once sync.Once
 
 	for {
 		select {
@@ -76,11 +75,6 @@ func tunneling(ctx context.Context, config *Config, client *ssh.Client) error {
 			fmt.Printf("[signal] shutdown\n")
 			ctxErr = ctx.Err()
 			lsnr.Close()
-			// once.Do(func() {
-			// 	fmt.Printf("[signal] shutdown\n")
-			// 	ctxErr = ctx.Err()
-			// 	lsnr.Close()
-			// })
 		case err, ok := <-errCh:
 			if !ok {
 				fmt.Printf("Local Port(:%s) X-------[tunneling disconnected]-------X Remote Port(:%s)\r", config.LocalPort, config.RemotePort)
