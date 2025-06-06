@@ -6,10 +6,11 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"sshtn/mods/prompt"
-	"sshtn/mods/storage"
+	"sshtn/tui"
 	"syscall"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -20,16 +21,11 @@ func main() {
 }
 
 func run(ctx context.Context, args []string) error {
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	go monitorMemory(ctx)
-
-	if err := storage.CreateStorage(); err != nil {
-		return err
-	}
-
-	if err := prompt.Run(ctx); err != nil {
+	p := tea.NewProgram(tui.NewMainMenu())
+	if _, err := p.Run(); err != nil {
 		return err
 	}
 
