@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"fmt"
 	"sshtn/internal/db"
 )
 
@@ -19,10 +20,12 @@ type SSHConfig struct {
 }
 
 func (store *SSHStore) SaveConfig(ctx context.Context, cfg SSHConfig) error {
-	// sqlText := `
-	// INSERT INTO
-	// `
-	// store.db.ExecContext()
-	// store.db.ExecContext(ctx, sqlText, )
+	sqlText := `
+	INSERT INTO ssh_configs (name, key_path) VALUES (?, ?)
+	`
+	if _, err := store.db.ExecContext(ctx, sqlText, cfg.Name, cfg.KeyPath); err != nil {
+		return fmt.Errorf("[SSH-SaveConfig] failed to exec db: %v", err)
+	}
 
+	return nil
 }
