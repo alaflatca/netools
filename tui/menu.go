@@ -2,118 +2,97 @@ package tui
 
 import (
 	"fmt"
-	tui "sshtn/tui/ssh"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type actionFunc func() (tea.Model, tea.Cmd)
-
-type modelItem struct {
-	title  string
-	action actionFunc
+type Item struct {
+	Name   string
+	Action func() (tea.Model, tea.Cmd)
 }
 
-type model struct {
-	cursor   int
-	items    []modelItem
-	selected string
+type MenuModel struct {
+	Items  []Item
+	Cursor int
 }
 
-type changeModelMsg tea.Model
-
-func NewMainMenu() tea.Model {
-	return initialModel()
-}
-
-func initialModel() model {
-	return model{
-		items: []modelItem{
+func NewMenuModel() *MenuModel {
+	return &MenuModel{
+		Items: []Item{
 			{
-				title: "SSH",
-				action: func() (tea.Model, tea.Cmd) {
-					return tui.NewSSHMenu(), nil
+				Name: "SSH",
+				Action: func() (tea.Model, tea.Cmd) {
+					return NewSSHModel(), nil
 				},
 			},
 			{
-				title: "VPN",
-				action: func() (tea.Model, tea.Cmd) {
-					return nil, nil
+				Name: "VPN",
+				Action: func() (tea.Model, tea.Cmd) {
+					return NewVPNModel(), nil
 				},
 			},
 			{
-				title: "Reverse Proxy",
-				action: func() (tea.Model, tea.Cmd) {
-					return nil, nil
+				Name: "Reverse Proxy",
+				Action: func() (tea.Model, tea.Cmd) {
+					return NewReverseModel(), nil
 				},
 			},
 			{
-				title: "Tool",
-				action: func() (tea.Model, tea.Cmd) {
-					return nil, nil
+				Name: "Tool",
+				Action: func() (tea.Model, tea.Cmd) {
+					return NewToolModel(), nil
 				},
 			},
 		},
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (p *MenuModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (p *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "K":
-			if m.cursor > 0 {
-				m.cursor--
+		case "q":
+			return p, tea.Quit
+		case "b": // pop
+			return p, pop()
+		case "up":
+			if p.Cursor > 0 {
+				p.Cursor--
 			}
-		case "down", "j":
-			if m.cursor < len(m.items)-1 {
-				m.cursor++
+		case "down":
+			if p.Cursor < len(p.Items)-1 {
+				p.Cursor++
 			}
-		case "enter":
-			switch m.cursor {
-			case 0:
-				return m, func() tea.Msg {
-					return changeModelMsg(tui.NewSSHMenu())
-				}
-			case 1:
-				return m, tea.Quit
-			case 2:
-				return m, tea.Quit
-			case 3:
-				return m, tea.Quit
+		case "enter": // push
+			item := p.Items[p.Cursor]
+			if item.Action != nil {
+				model, innerCmd := item.Action()
+				return p, PushWithCmd(model, innerCmd)
 			}
 		}
-	case changeModelMsg:
-		return msg, nil
 	}
-
-	return m, nil
+	return p, nil
 }
 
-func (m model) View() string {
-	s := "\n\t\t[Network Tools]\n"
-	s += "Select a tool:\n"
+func (p *MenuModel) View() string {
+	var b strings.Builder
+	b.WriteString("\n\t\t[ Netools ]\n\n")
 
-	for i, item := range m.items {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
+	for i, item := range p.Items {
+		cursor := "  "
+		if p.Cursor == i {
+			cursor = "> "
 		}
-		s += fmt.Sprintf("%s %s\n", cursor, item.title)
-
-	}
-	s += "\n↑↓ to navigate • Enter to select • q to quit\n"
-
-	if m.selected != "" {
-		s += fmt.Sprintf("\nYou selected: %s\n", m.selected)
+		s := fmt.Sprintf("%s%d. %s\n", cursor, i+1, item.Name)
+		b.WriteString(s)
 	}
 
-	return s
+	b.WriteString("\n[↑/↓ to change • Enter to select • q to quit]")
+
+	return b.String()
 }

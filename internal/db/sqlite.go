@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"time"
 
@@ -15,17 +16,20 @@ type DB interface {
 	Close() error
 }
 
+//go:embed schema/schema.sql
+var schemaSQL string
+
 type Sqlite struct {
 	db *sql.DB
 }
 
-func NewSqlite(path string) (*Sqlite, error) {
+func New(ctx context.Context, path string) (*Sqlite, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping db: %v", err)
@@ -44,4 +48,12 @@ func (s *Sqlite) ExecContext(ctx context.Context, query string, args ...any) (sq
 
 func (s *Sqlite) Close() error {
 	return s.db.Close()
+}
+
+func (s *Sqlite) CreateTable(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, schemaSQL)
+	if err != nil {
+		return fmt.Errorf("failed to execute schema: %v", err)
+	}
+	return nil
 }

@@ -2,9 +2,9 @@ package common
 
 import "os"
 
-func FileExist(name string) bool {
+func FileNotExist(name string) bool {
 	if _, err := os.Stat(name); os.IsNotExist(err) {
-		return false
+		return true
 	}
-	return true
+	return false
 }

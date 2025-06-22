@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func session(ctx context.Context, conf *Config, client *ssh.Client) error {
+func session(ctx context.Context, client *ssh.Client) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
