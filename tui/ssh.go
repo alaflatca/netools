@@ -29,6 +29,8 @@ func NewSSHModel() *SSHModel {
 }
 
 func (m *SSHModel) Init() tea.Cmd {
+	// select
+	// m.items = append(m.items, nil)
 	return nil
 }
 
@@ -39,7 +41,19 @@ func (m *SSHModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "b":
-			return m, pop()
+			return m, Pop()
+		case "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down":
+			if m.cursor < len(m.items)-1 {
+				m.cursor++
+			}
+		case "enter":
+			if m.cursor == 0 {
+				return m, Push(NewSSHConfigModel())
+			}
 		}
 	}
 	return m, nil
@@ -51,7 +65,7 @@ func (m *SSHModel) View() string {
 
 	for i, item := range m.items {
 		cursor := "  "
-		if m.cursor == i {
+		if i == m.cursor {
 			cursor = "> "
 		}
 

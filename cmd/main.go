@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"netools/internal/db"
+	"netools/tui"
 	"os"
 	"os/signal"
-	"sshtn/internal/db"
-	"sshtn/tui"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"

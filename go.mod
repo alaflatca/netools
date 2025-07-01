@@ -1,4 +1,4 @@
-module sshtn
+module netools
 
 go 1.23.0
 

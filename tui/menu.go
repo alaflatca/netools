@@ -59,7 +59,7 @@ func (p *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return p, tea.Quit
 		case "b": // pop
-			return p, pop()
+			return p, Pop()
 		case "up":
 			if p.Cursor > 0 {
 				p.Cursor--

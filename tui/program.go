@@ -1,14 +1,11 @@
 package tui
 
 import (
-	"fmt"
-	"os"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type popModelMsg struct{}
-type pushModelMsg struct{ model tea.Model }
+type PopModelMsg struct{}
+type PushModelMsg struct{ model tea.Model }
 
 type ProgramModel struct {
 	stack []tea.Model
@@ -25,18 +22,18 @@ func (p *ProgramModel) Init() tea.Cmd {
 }
 
 func (p *ProgramModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	fmt.Fprintf(os.Stdout, "[DEBUG] Update called with msg: %T\n", msg)
 	if len(p.stack) == 0 {
 		return p, tea.Quit
 	}
 
 	switch m := msg.(type) {
-	case popModelMsg:
+	case PopModelMsg:
 		if len(p.stack) > 1 {
 			p.stack = p.stack[:len(p.stack)-1]
-			return p, nil
+			top := p.stack[len(p.stack)-1]
+			return p, top.Init()
 		}
-	case pushModelMsg:
+	case PushModelMsg:
 		p.stack = append(p.stack, m.model)
 		return p, m.model.Init()
 	}
@@ -53,21 +50,21 @@ func (p *ProgramModel) View() string {
 	return p.stack[len(p.stack)-1].View()
 }
 
-func pop() tea.Cmd {
+func Pop() tea.Cmd {
 	return func() tea.Msg {
-		return popModelMsg{}
+		return PopModelMsg{}
 	}
 }
 
-func push(m tea.Model) tea.Cmd {
+func Push(m tea.Model) tea.Cmd {
 	return func() tea.Msg {
-		return pushModelMsg{model: m}
+		return PushModelMsg{model: m}
 	}
 }
 
 func PushWithCmd(m tea.Model, cmd tea.Cmd) tea.Cmd {
 	return tea.Batch(
-		push(m),
+		Push(m),
 		cmd,
 	)
 }
