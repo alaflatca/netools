@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"log"
+	"netools/internal/db"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,9 +20,12 @@ const (
 type SSHConfigModel struct {
 	inputs   []textinput.Model
 	focusIdx int
-	step     step
-	name     string
-	keypath  string
+
+	step    step
+	name    string
+	keypath string
+
+	err error
 }
 
 func NewSSHConfigModel() *SSHConfigModel {
@@ -43,8 +48,7 @@ func NewSSHConfigModel() *SSHConfigModel {
 
 func (m *SSHConfigModel) Init() tea.Cmd {
 	m.inputs[0].Focus()
-	// return textinput.Blink
-	return nil
+	return textinput.Blink
 }
 
 func (m *SSHConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -63,6 +67,15 @@ func (m *SSHConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.keypath = m.inputs[1].Value()
 				m.step = stepDone
 			case stepDone:
+				err := db.InsertSSHConfig(db.SSHConfig{
+					Name:    m.name,
+					KeyPath: m.keypath,
+				})
+				if err != nil {
+					log.Printf("[ssh] failed to config insert: %v", err)
+					m.err = err
+					return m, nil
+				}
 				return m, Pop()
 			default:
 				return m, Pop()
@@ -87,7 +100,7 @@ func (m *SSHConfigModel) View() string {
 	case stepKeyPath:
 		return fmt.Sprintf("KeyPath:\n%s\n\n(press Enter to continue)", m.inputs[1].View())
 	case stepDone:
-		return fmt.Sprintf("Done!\n\nName: %s\nKeyPath: %s\n\npress any key to exit.", m.name, m.keypath)
+		return fmt.Sprintf("\nDone!\n\nName: %s\nKeyPath: %s\n\npress any key to exit.", m.name, m.keypath)
 	default:
 		return "Unkown Step"
 	}

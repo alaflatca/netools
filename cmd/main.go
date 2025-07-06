@@ -27,14 +27,14 @@ func run(ctx context.Context) error {
 
 	// sqlite 생성
 	dbname := "./tmp/netools.db"
-	db, err := db.New(ctx, dbname)
+	err := db.Init(ctx, dbname)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
 	// sqlite 테이블 생성
-	if err := db.CreateTable(ctx); err != nil {
+	if err := db.Migrate(ctx); err != nil {
 		return err
 	}
 
