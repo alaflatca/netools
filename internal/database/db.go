@@ -36,6 +36,11 @@ func Init(ctx context.Context, path string) error {
 	if err := conn.PingContext(ctx); err != nil {
 		return fmt.Errorf("failed to ping db: %v", err)
 	}
+
+	if err := Migrate(ctx); err != nil {
+		return fmt.Errorf("failed to migrate db: %v", err)
+	}
+
 	return nil
 }
 

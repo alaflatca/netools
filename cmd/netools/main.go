@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"netools/internal/db"
-	"netools/tui"
+	db "netools/internal/database"
+	"netools/internal/tui"
 	"os"
 	"os/signal"
 	"syscall"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // var dbPath flag.String  ("dbPath","./tmp/netools.db","sqlite storage path")
@@ -33,14 +31,7 @@ func run(ctx context.Context) error {
 	}
 	defer db.Close()
 
-	// sqlite 테이블 생성
-	if err := db.Migrate(ctx); err != nil {
-		return err
-	}
-
-	// tui 시작
-	p := tea.NewProgram(tui.NewProgramModel(), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	if err := tui.Start(ctx); err != nil {
 		return err
 	}
 

@@ -48,7 +48,7 @@ func makeKnownHostsCallback(knownHostsPath string) (ssh.HostKeyCallback, error) 
 	}, nil
 }
 
-func createSshConfig(userName, keyFile string) (*ssh.ClientConfig, error) {
+func CreateSshConfig(userName, keyFile string) (*ssh.ClientConfig, error) {
 	knownHostsPath := sshConfigPath("known_hosts")
 	hostKeyCallback, err := makeKnownHostsCallback(knownHostsPath)
 	if err != nil {

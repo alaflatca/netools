@@ -7,7 +7,23 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func session(ctx context.Context, client *ssh.Client) error {
+type SessionArgs struct {
+	Network   string
+	Host      string
+	Port      string
+	ClientCfg *ssh.ClientConfig
+}
+
+func Client(args SessionArgs) (*ssh.Client, error) {
+	client, err := ssh.Dial(args.Network, args.Host+":"+args.Port, args.ClientCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func Session(ctx context.Context, client *ssh.Client) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -21,7 +37,7 @@ func session(ctx context.Context, client *ssh.Client) error {
 	defer session.Close()
 
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,     // disable echoing
+		ssh.ECHO:          1,     // disable echoing
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
