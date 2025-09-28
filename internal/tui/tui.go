@@ -19,26 +19,22 @@ func Start(ctx context.Context) error {
 		return false
 	})
 
-	sshName, sshView := sshtool.NewView()
+	ssh := sshtool.NewView(app)
 	vpnName, vpnView := vpntool.NewView()
 	reverseName, reverseView := reversetool.NewView()
 
 	side := tview.NewList().
-		AddItem(sshName, "", '1', nil).
+		AddItem(ssh.Name, "", '1', nil).
 		AddItem(vpnName, "", '2', nil).
 		AddItem(reverseName, "", '3', nil)
 	side.SetBorder(true)
 	side.SetTitle(" netools ")
 
 	pages := tview.NewPages()
-	pages.AddPage(sshName, sshView, true, true)
-	pages.AddPage(vpnName, vpnView, true, false)
-	pages.AddPage(reverseName, reverseView, true, false)
-	pages.SetBorder(true)
-	pages.SetTitle(" " + sshName + " ")
+	pages.AddPage(ssh.Name, ssh.FocusDefault(), true, true)
 
 	focusTarget := map[string]tview.Primitive{
-		sshName:     sshView,
+		ssh.Name:    ssh.FocusDefault(),
 		vpnName:     vpnView,
 		reverseName: reverseView,
 	}
