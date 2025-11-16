@@ -19,48 +19,47 @@ type Querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-var conn *sql.DB
+type DB struct {
+	conn *sql.DB
+}
 
-func Init(ctx context.Context, path string) error {
-	if conn != nil {
-		return nil
-	}
-	var err error
-	conn, err = sql.Open("sqlite", path)
+func New(path string) (*DB, error) {
+	db := &DB{}
+	conn, err := sql.Open("sqlite", path)
 	if err != nil {
-		return fmt.Errorf("failed to open db: %v", err)
+		return nil, fmt.Errorf("failed to open db: %v", err)
 	}
+	db.conn = conn
 
+	return db, nil
+}
+
+func (d *DB) Start(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
-	if err := conn.PingContext(ctx); err != nil {
+
+	if err := d.conn.PingContext(ctx); err != nil {
 		return fmt.Errorf("failed to ping db: %v", err)
 	}
 
-	if err := Migrate(ctx); err != nil {
+	if err := d.Migrate(ctx); err != nil {
 		return fmt.Errorf("failed to migrate db: %v", err)
 	}
 
 	return nil
 }
 
-func Get() Querier {
-	if conn != nil {
-		return conn
-	}
-	panic("DB Not Initialized")
-}
+func (d *DB) Stop() {
+	if d.conn != nil {
+		if err := d.conn.Close(); err != nil {
 
-func Close() error {
-	if conn == nil {
-		return nil
+		}
 	}
-	return conn.Close()
 }
 
 // 나중에 sqlite_ssh.go로 이동?
-func Migrate(ctx context.Context) error {
-	_, err := conn.ExecContext(ctx, schemaSQL)
+func (d *DB) Migrate(ctx context.Context) error {
+	_, err := d.conn.ExecContext(ctx, schemaSQL)
 	if err != nil {
 		return fmt.Errorf("failed to execute schema: %v", err)
 	}

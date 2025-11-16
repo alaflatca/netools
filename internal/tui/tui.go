@@ -2,15 +2,22 @@ package tui
 
 import (
 	"context"
-	reversetool "netools/internal/reversetool/view"
+	"netools/internal/db"
 	sshtool "netools/internal/sshtool/view"
-	vpntool "netools/internal/vpntool/view"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
-func Start(ctx context.Context) error {
+func Start(ctx context.Context, db *db.DB) error {
+	const (
+		pageMain    = "main"
+		pageSSH     = "ssh"
+		pageVPN     = "vpn"
+		pageReverse = "reverse"
+		pageTools   = "tools"
+	)
+
 	app := tview.NewApplication()
 	app.SetBeforeDrawFunc(func(s tcell.Screen) bool {
 		s.SetStyle(tcell.StyleDefault.
@@ -19,51 +26,67 @@ func Start(ctx context.Context) error {
 		return false
 	})
 
-	ssh := sshtool.NewView(app)
-	vpnName, vpnView := vpntool.NewView()
-	reverseName, reverseView := reversetool.NewView()
+	menu := tview.NewList().
+		AddItem("ssh", "", '1', nil).
+		AddItem("vpn", "", '2', nil).
+		AddItem("reverse proxy", "", '3', nil).
+		AddItem("tools", "", '4', nil)
+	menu.SetBorder(true).SetTitle("  netools  ")
 
-	side := tview.NewList().
-		AddItem(ssh.Name, "", '1', nil).
-		AddItem(vpnName, "", '2', nil).
-		AddItem(reverseName, "", '3', nil)
-	side.SetBorder(true)
-	side.SetTitle(" netools ")
+	// logging도 추가 필요
+	sshPage := sshtool.NewView(app, db)
 
 	pages := tview.NewPages()
-	pages.AddPage(ssh.Name, ssh.FocusDefault(), true, true)
+	pages.AddPage(pageMain, menu, true, true)
+	pages.AddPage(pageSSH, sshPage.Root, true, false)
 
 	focusTarget := map[string]tview.Primitive{
-		ssh.Name:    ssh.FocusDefault(),
-		vpnName:     vpnView,
-		reverseName: reverseView,
+		pageMain:    menu,
+		pageSSH:     sshPage.Root,
+		pageVPN:     nil,
+		pageReverse: nil,
+		pageTools:   nil,
 	}
 
-	side.SetChangedFunc(func(index int, mainText, secondaryText string, shortcut rune) {
-		pages.SetTitle(" " + mainText + " ")
-		pages.SwitchToPage(mainText)
+	switchTo := func(name string) {
+		pages.SwitchToPage(name)
+		if v, ok := focusTarget[name]; ok {
+			app.SetFocus(v)
+		}
+	}
+
+	menu.SetSelectedFunc(func(i int, main, secondary string, shortcut rune) {
+		pages.SwitchToPage(secondary)
 	})
 
 	app.SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
 		switch ev.Key() {
-		case tcell.KeyLeft, tcell.KeyExit:
-			app.SetFocus(side)
+		case tcell.KeyEscape:
+			switchTo(pageMain)
 			return nil
-		case tcell.KeyRight, tcell.KeyTab, tcell.KeyEnter:
-			name, _ := pages.GetFrontPage()
-			if page, ok := focusTarget[name]; ok {
-				app.SetFocus(page)
+		case tcell.KeyCtrlC:
+			app.Stop()
+			return nil
+		case tcell.KeyRune:
+			switch ev.Rune() {
+			case '1':
+				switchTo(pageSSH)
+				return nil
+			case '2':
+				switchTo(pageVPN)
+				return nil
+			case '3':
+				switchTo(pageReverse)
+				return nil
+			case '4':
+				switchTo(pageTools)
+				return nil
 			}
-
 		}
 		return ev
 	})
 
-	layout := tview.NewFlex().
-		AddItem(side, 24, 0, true).
-		AddItem(pages, 0, 1, false)
-
-	if err := app.SetRoot(layout, true).Run(); err != nil {
+	if err := app.SetRoot(pages, true).EnableMouse(true).Run(); err != nil {
 		return err
 	}
 	return nil

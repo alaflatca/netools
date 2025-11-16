@@ -16,27 +16,27 @@ type SSHConfig struct {
 	CreatedAt time.Time
 }
 
-func InsertSSHConfig(cfg SSHConfig) error {
+func InsertSSHConfig(ctx context.Context, db *DB, cfg SSHConfig) error {
 	log.Printf("insert cfg: %+v\n", cfg)
 	baseSQL := `INSERT INTO ssh_configs (name, ip, port, key_path, desc) VALUES (?, ?, ?, ?, ?)`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	_, err := Get().ExecContext(ctx, baseSQL, cfg.Name, cfg.IP, cfg.Port, cfg.KeyPath, cfg.Desc)
+	_, err := db.conn.ExecContext(ctx, baseSQL, cfg.Name, cfg.IP, cfg.Port, cfg.KeyPath, cfg.Desc)
 	if err != nil {
 		return fmt.Errorf("[SSH] failed to insert config: %v", err)
 	}
 	return nil
 }
 
-func SelectSSHConfigs() ([]SSHConfig, error) {
+func SelectSSHConfigs(ctx context.Context, db *DB) ([]SSHConfig, error) {
 	sqlText := `SELECT name, ip, port, key_path, desc FROM ssh_configs ORDER BY created_at DESC`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := Get().QueryContext(ctx, sqlText)
+	rows, err := db.conn.QueryContext(ctx, sqlText)
 	if err != nil {
 		return nil, err
 	}

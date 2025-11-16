@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	db "netools/internal/database"
+	"netools/internal/db"
 	"netools/internal/tui"
 	"os"
 	"os/signal"
@@ -23,17 +23,23 @@ func run(ctx context.Context) error {
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// sqlite 생성
+	// database Init
 	dbname := "./tmp/netools.db"
-	err := db.Init(ctx, dbname)
+	db, err := db.New(dbname)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer db.Stop()
 
-	if err := tui.Start(ctx); err != nil {
+	// logging Init
+	// logging.New()
+
+	// tui Init
+	if err := tui.Start(ctx, db); err != nil {
 		return err
 	}
+
+	// *mods --> internal/*tool/api
 
 	return nil
 }
