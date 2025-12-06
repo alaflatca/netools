@@ -1,8 +1,9 @@
-package ssh
+package sshtool
 
 import (
 	"context"
-	"os"
+	"fmt"
+	"io"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -10,12 +11,13 @@ import (
 type SessionArgs struct {
 	Network   string
 	Host      string
-	Port      string
+	Port      int
 	ClientCfg *ssh.ClientConfig
 }
 
-func Client(args SessionArgs) (*ssh.Client, error) {
-	client, err := ssh.Dial(args.Network, args.Host+":"+args.Port, args.ClientCfg)
+func NewSSHClient(args SessionArgs) (*ssh.Client, error) {
+	addr := fmt.Sprintf("%s:%d", args.Host, args.Port)
+	client, err := ssh.Dial(args.Network, addr, args.ClientCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +25,7 @@ func Client(args SessionArgs) (*ssh.Client, error) {
 	return client, nil
 }
 
-func Session(ctx context.Context, client *ssh.Client) error {
+func Session(ctx context.Context, client *ssh.Client, in io.Reader, out io.Writer) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -33,7 +35,6 @@ func Session(ctx context.Context, client *ssh.Client) error {
 		<-ctx.Done()
 		session.Close()
 	}()
-
 	defer session.Close()
 
 	modes := ssh.TerminalModes{
@@ -46,14 +47,13 @@ func Session(ctx context.Context, client *ssh.Client) error {
 		return err
 	}
 
-	session.Stdout = os.Stdout
-	session.Stdin = os.Stdin
-	session.Stderr = os.Stderr
+	session.Stdin = in
+	session.Stdout = out
+	session.Stderr = out
 
 	if err := session.Shell(); err != nil {
 		return err
 	}
-
 	if err := session.Wait(); err != nil {
 		return err
 	}

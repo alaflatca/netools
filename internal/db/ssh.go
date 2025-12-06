@@ -1,55 +1,143 @@
+// db/sqlite_ssh.go 같은 파일
+
 package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"log"
 	"time"
 )
 
 type SSHConfig struct {
+	ID        int64
 	Name      string
 	IP        string
+	User      string
+	Password  string
 	Port      string
 	KeyPath   string
 	Desc      string
 	CreatedAt time.Time
 }
 
-func InsertSSHConfig(ctx context.Context, db *DB, cfg SSHConfig) error {
-	log.Printf("insert cfg: %+v\n", cfg)
-	baseSQL := `INSERT INTO ssh_configs (name, ip, port, key_path, desc) VALUES (?, ?, ?, ?, ?)`
+func InsertSSHConfig(ctx context.Context, db *DB, cfg SSHConfig) (int64, error) {
+	baseSQL := `
+        INSERT INTO ssh_configs (name, ip, user, password, port, key_path, desc)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
 
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	_, err := db.conn.ExecContext(ctx, baseSQL, cfg.Name, cfg.IP, cfg.Port, cfg.KeyPath, cfg.Desc)
+	res, err := db.conn.ExecContext(ctx, baseSQL,
+		cfg.Name,
+		cfg.IP,
+		cfg.User,
+		cfg.Password,
+		cfg.Port,
+		cfg.KeyPath,
+		cfg.Desc,
+	)
 	if err != nil {
-		return fmt.Errorf("[SSH] failed to insert config: %v", err)
+		return 0, fmt.Errorf("[SSH] failed to insert config: %w", err)
 	}
-	return nil
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("[SSH] failed to get last insert id: %w", err)
+	}
+	return id, nil
 }
 
 func SelectSSHConfigs(ctx context.Context, db *DB) ([]SSHConfig, error) {
-	sqlText := `SELECT name, ip, port, key_path, desc FROM ssh_configs ORDER BY created_at DESC`
+	sqlText := `
+        SELECT id, name, ip, user, password, port, key_path, desc, created_at
+        FROM ssh_configs
+        ORDER BY created_at DESC
+    `
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	rows, err := db.conn.QueryContext(ctx, sqlText)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[SSH] failed to query configs: %w", err)
 	}
+	defer rows.Close()
 
-	sshConfigs := []SSHConfig{}
+	var sshConfigs []SSHConfig
 	for rows.Next() {
 		var sshConfig SSHConfig
-		err := rows.Scan(&sshConfig.Name, &sshConfig.IP, &sshConfig.Port, &sshConfig.KeyPath, &sshConfig.Desc)
-		if err != nil {
-			return nil, err
+		if err := rows.Scan(
+			&sshConfig.ID,
+			&sshConfig.Name,
+			&sshConfig.IP,
+			&sshConfig.User,
+			&sshConfig.Password,
+			&sshConfig.Port,
+			&sshConfig.KeyPath,
+			&sshConfig.Desc,
+			&sshConfig.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("[SSH] failed to scan row: %w", err)
 		}
 		sshConfigs = append(sshConfigs, sshConfig)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("[SSH] rows error: %w", err)
+	}
 
 	return sshConfigs, nil
+}
+
+func UpdateSSHConfig(ctx context.Context, db *DB, cfg SSHConfig) error {
+	if cfg.ID == 0 {
+		return fmt.Errorf("[SSH] UpdateSSHConfig: missing ID")
+	}
+
+	sqlText := `
+        UPDATE ssh_configs
+        SET name = ?, ip = ?, user = ?, password = ?, port = ?, key_path = ?, desc = ?
+        WHERE id = ?
+    `
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	res, err := db.conn.ExecContext(ctx, sqlText,
+		cfg.Name,
+		cfg.IP,
+		cfg.User,
+		cfg.Password,
+		cfg.Port,
+		cfg.KeyPath,
+		cfg.Desc,
+		cfg.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("[SSH] failed to update config: %w", err)
+	}
+
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func DeleteSSHConfig(ctx context.Context, db *DB, id int64) error {
+	sqlText := `DELETE FROM ssh_configs WHERE id = ?`
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	res, err := db.conn.ExecContext(ctx, sqlText, id)
+	if err != nil {
+		return fmt.Errorf("[SSH] failed to delete config: %w", err)
+	}
+
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

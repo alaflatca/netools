@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -12,12 +13,6 @@ import (
 
 //go:embed schema/schema.sql
 var schemaSQL string
-
-type Querier interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
 
 type DB struct {
 	conn *sql.DB
@@ -52,7 +47,7 @@ func (d *DB) Start(ctx context.Context) error {
 func (d *DB) Stop() {
 	if d.conn != nil {
 		if err := d.conn.Close(); err != nil {
-
+			log.Printf("conn close error: %v\n", err)
 		}
 	}
 }

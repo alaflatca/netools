@@ -1,4 +1,4 @@
-package ssh
+package sshtool
 
 // func tunneling(ctx context.Context, client *ssh.Client) error {
 // 	if err := promptTunneling(config); err != nil {

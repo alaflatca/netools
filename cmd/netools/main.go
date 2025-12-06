@@ -30,6 +30,9 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer db.Stop()
+	if err := db.Start(ctx); err != nil {
+		return err
+	}
 
 	// logging Init
 	// logging.New()
@@ -39,7 +42,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	// *mods --> internal/*tool/api
+	// mods --> internal/*tool/api
 
 	return nil
 }

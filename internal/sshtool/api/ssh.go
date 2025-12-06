@@ -1,4 +1,4 @@
-package ssh
+package sshtool
 
 import (
 	"fmt"
@@ -48,28 +48,40 @@ func makeKnownHostsCallback(knownHostsPath string) (ssh.HostKeyCallback, error) 
 	}, nil
 }
 
-func CreateSshConfig(userName, keyFile string) (*ssh.ClientConfig, error) {
+func CreateSshConfig(userName, password string, keyFile string) (*ssh.ClientConfig, error) {
 	knownHostsPath := sshConfigPath("known_hosts")
 	hostKeyCallback, err := makeKnownHostsCallback(knownHostsPath)
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, err
+	// 비밀번호 인증
+	var authoMethod []ssh.AuthMethod
+
+	if password != "" {
+		authoMethod = append(authoMethod, ssh.Password(password))
 	}
-	singer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return nil, err
+
+	// 키 인증
+	if keyFile != "" {
+		key, err := os.ReadFile(keyFile)
+		if err != nil {
+			return nil, err
+		}
+		singer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			return nil, err
+		}
+		authoMethod = append(authoMethod, ssh.PublicKeys(singer))
+	}
+
+	if len(authoMethod) == 0 {
+		return nil, fmt.Errorf("no auth method provided")
 	}
 
 	return &ssh.ClientConfig{
-		User: userName,
-
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(singer),
-		},
+		User:            userName,
+		Auth:            authoMethod,
 		HostKeyCallback: hostKeyCallback,
 		HostKeyAlgorithms: []string{
 			ssh.KeyAlgoRSA,       // RSA
